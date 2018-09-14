@@ -1,0 +1,141 @@
+mem_mngr_alloc()
+	MEM_ALIGNMENT_BOUNDARY => Code runs successfully for other values i.e. multiples of 8 like 16, 24, etc.
+	MEM_BATCH_SLOT_COUNT => Code runs successfully for other values i.e. multiples of 8 like 16, 24, etc.
+	free_slots_bitmap => is allocated memory on heap. The corresponding bit in free_slots_bitmap is cleared after a slot is allocated to user program. Expanded when a new batch is added to a list with old contents unchanged. BIT 0 represents USED slot and BIT 1 represents FREE slot.
+
+mem_mngr_free()
+	All 3 specified cases are checked.
+	The corresponding bit in free_slots_bitmap is set as a slot is freed.
+
+mem_mngr_leave()
+	Successfully frees all the heap memory allocated.
+
+
+Description :
+
+When malloc is called by the user, mem_pool is checked. If it is NULL i.e. it does not contain any memory lists, new memory list is created of SLOT_ALLINED_SIZE(size). If mem_pool is not NULL i.e. it already contains memory list(s), the memory lists are traversed to find the required SLOT_ALLINED_SIZE(size). If no mem_list are having slots of SLOT_ALLINED_SIZE(size), create new mem_list and add it to the end of the list. In the obtained memory list find the first empty slot in memory batches using free_slots_bitmap. If empty slot is not found, create new mem_batch, add it to the end of mem_batch linked list and obtain it's first empty slot. If empty slot is found, calculate start address of the free memory slot in the memory batch. Clear the bit of empty slot in free_slots_bitmap and return start address of empty slot.
+If malloc is called with negative value it is alligned to 0.
+
+When free is called by the user, traverse through all memory lists and it's memory batches to check if ptr address to be freed is present. If address is found in the batch, check if address is not the starting address of an any slot. Check if address is the starting address of an unassigned slot using bitmap_bit_is_set(). Free the slot by setting the bit in free_slots_bitmap.
+
+While leaving, free the memory allocated to batch_mem and structure of memory batches. Also, free the memory allocated to free_slots_bitmap and memory lists.
+
+
+Log of Test Cases :
+
+The program works for all values of MEM_ALIGNMENT_BOUNDARY and MEM_BATCH_SLOT_COUNT which are multiples of 8.
+
+Consider Following Case :
+
+MEM_ALIGNMENT_BOUNDARY = 16
+MEM_BATCH_SLOT_COUNT = 16
+
+Input Test Cases :
+
+	mem_mngr_init();
+	int * ptr = malloc(1);
+	ptr = malloc(1);
+	ptr = malloc(1);
+	ptr = malloc(1);
+	ptr = malloc(1);
+	ptr = malloc(1);
+	ptr = malloc(1);
+	ptr = malloc(1);
+	ptr = malloc(2);
+	ptr = malloc(3);
+	void * ptr2 = malloc(2);
+	ptr2 = malloc(12);
+	ptr2 = malloc(10);
+	mem_mngr_print_snapshot();
+	ptr2 = malloc(15);
+	ptr2 = malloc(15);
+	ptr2 = malloc(15);
+	void * ptr3 = malloc(12);
+	mem_mngr_print_snapshot();
+	void * ptr5 = malloc(48);
+	int * ptr6 = malloc(44);
+	ptr6 = malloc(40);
+	ptr6 = malloc(36);
+	ptr6 = malloc(55);
+	ptr6 = malloc(49);
+	void * ptr4 = malloc(52);
+	mem_mngr_print_snapshot();
+	free(ptr);
+	free(ptr3);
+	free(ptr5);
+	mem_mngr_print_snapshot();
+	ptr6 = malloc(1);
+	ptr4 = malloc(48);
+	mem_mngr_print_snapshot();
+	free(ptr2);
+	free(ptr4);
+	free(ptr6);
+	mem_mngr_print_snapshot();
+    mem_mngr_leave();
+	mem_mngr_print_snapshot();
+
+Output :
+
+============== Memory snapshot ===============
+mem_list 0x13d2010 slot_size 16 batch_count 1 free_slot_bitmap 0x13d2170
+bitmap 0x13d2170 size 2 bytes: 0000  0000  0000  0111  
+	 mem_batch 0x13d2040 batch_mem 0x13d2060
+==============================================
+============== Memory snapshot ===============
+mem_list 0x13d2010 slot_size 16 batch_count 2 free_slot_bitmap 0x13d2170
+bitmap 0x13d2170 size 4 bytes: 0000  0000  0000  0000  0111  1111  1111  1111  
+	 mem_batch 0x13d2040 batch_mem 0x13d2060
+	 mem_batch 0x13d25a0 batch_mem 0x13d25c0
+==============================================
+============== Memory snapshot ===============
+mem_list 0x13d2010 slot_size 16 batch_count 2 free_slot_bitmap 0x13d2170
+bitmap 0x13d2170 size 4 bytes: 0000  0000  0000  0000  0111  1111  1111  1111  
+	 mem_batch 0x13d2040 batch_mem 0x13d2060
+	 mem_batch 0x13d25a0 batch_mem 0x13d25c0
+mem_list 0x13d26d0 slot_size 48 batch_count 1 free_slot_bitmap 0x13d2a30
+bitmap 0x13d2a30 size 2 bytes: 0000  1111  1111  1111  
+	 mem_batch 0x13d2700 batch_mem 0x13d2720
+mem_list 0x13d2a50 slot_size 64 batch_count 1 free_slot_bitmap 0x13d2eb0
+bitmap 0x13d2eb0 size 2 bytes: 0001  1111  1111  1111  
+	 mem_batch 0x13d2a80 batch_mem 0x13d2aa0
+==============================================
+============== Memory snapshot ===============
+mem_list 0x13d2010 slot_size 16 batch_count 2 free_slot_bitmap 0x13d2170
+bitmap 0x13d2170 size 4 bytes: 0000  0000  0100  0000  1111  1111  1111  1111  
+	 mem_batch 0x13d2040 batch_mem 0x13d2060
+	 mem_batch 0x13d25a0 batch_mem 0x13d25c0
+mem_list 0x13d26d0 slot_size 48 batch_count 1 free_slot_bitmap 0x13d2a30
+bitmap 0x13d2a30 size 2 bytes: 1000  1111  1111  1111  
+	 mem_batch 0x13d2700 batch_mem 0x13d2720
+mem_list 0x13d2a50 slot_size 64 batch_count 1 free_slot_bitmap 0x13d2eb0
+bitmap 0x13d2eb0 size 2 bytes: 0001  1111  1111  1111  
+	 mem_batch 0x13d2a80 batch_mem 0x13d2aa0
+==============================================
+============== Memory snapshot ===============
+mem_list 0x13d2010 slot_size 16 batch_count 2 free_slot_bitmap 0x13d2170
+bitmap 0x13d2170 size 4 bytes: 0000  0000  0000  0000  1111  1111  1111  1111  
+	 mem_batch 0x13d2040 batch_mem 0x13d2060
+	 mem_batch 0x13d25a0 batch_mem 0x13d25c0
+mem_list 0x13d26d0 slot_size 48 batch_count 1 free_slot_bitmap 0x13d2a30
+bitmap 0x13d2a30 size 2 bytes: 0000  1111  1111  1111  
+	 mem_batch 0x13d2700 batch_mem 0x13d2720
+mem_list 0x13d2a50 slot_size 64 batch_count 1 free_slot_bitmap 0x13d2eb0
+bitmap 0x13d2eb0 size 2 bytes: 0001  1111  1111  1111  
+	 mem_batch 0x13d2a80 batch_mem 0x13d2aa0
+==============================================
+============== Memory snapshot ===============
+mem_list 0x13d2010 slot_size 16 batch_count 2 free_slot_bitmap 0x13d2170
+bitmap 0x13d2170 size 4 bytes: 0000  0000  0100  0001  1111  1111  1111  1111  
+	 mem_batch 0x13d2040 batch_mem 0x13d2060
+	 mem_batch 0x13d25a0 batch_mem 0x13d25c0
+mem_list 0x13d26d0 slot_size 48 batch_count 1 free_slot_bitmap 0x13d2a30
+bitmap 0x13d2a30 size 2 bytes: 1000  1111  1111  1111  
+	 mem_batch 0x13d2700 batch_mem 0x13d2720
+mem_list 0x13d2a50 slot_size 64 batch_count 1 free_slot_bitmap 0x13d2eb0
+bitmap 0x13d2eb0 size 2 bytes: 0001  1111  1111  1111  
+	 mem_batch 0x13d2a80 batch_mem 0x13d2aa0
+==============================================
+
+Allocated Heap Memory Freed!
+============== Memory snapshot ===============
+==============================================

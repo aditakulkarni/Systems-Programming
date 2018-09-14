@@ -1,0 +1,35 @@
+Test Cases :
+
+C code:
+
+mybarrier_t *mb;
+
+void* threadFunc(void* param) {
+	int ret = mybarrier_wait(mb);
+	printf("\nReturn value : %d",ret);
+	return NULL;
+}
+
+int main(void){
+    int i;
+    pthread_t threads[5];
+	mb = mybarrier_init(5);
+
+    for (i = 0; i < 5; i++){
+        pthread_create(&threads[i], NULL, threadFunc, NULL);
+    }
+
+	for (i = 0; i < 5; i++){
+        pthread_join(threads[i], NULL);
+    }
+	mybarrier_destroy(mb);
+    printf("\n");
+    return 0;
+}
+
+Output :
+Return value : 0
+Return value : 0
+Return value : 0
+Return value : 0
+Return value : 0
